@@ -1,5 +1,4 @@
 require 'aws-sdk-s3'
-require "open-uri"
 require "refile"
 require "refile/s3/version"
 
@@ -95,7 +94,16 @@ module Refile
     # @param [String] id           The id of the file
     # @return [IO]                An IO object containing the file contents
     verify_id def open(id)
-      Kernel.open(object(id).presigned_url(:get))
+      object = object(id)
+
+      # Usa a SDK nativa da AWS (seguro e compatível com Ruby 3 / Rails 8)
+      begin
+        body = object.get.body
+        # Stream seguro via StringIO (igual ao Refile original)
+        StringIO.new(body.read)
+      rescue Aws::S3::Errors::NoSuchKey
+        raise Refile::InvalidID, "File not found on S3"
+      end
     end
 
     # Return the entire contents of the uploaded file as a String.
